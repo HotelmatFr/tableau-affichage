@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Départs - Aéroport de Paris-Charles de Gaulle (CDG)</title>
+  <style>
+    body {
+      background-color: #002b5c;
+      color: white;
+      font-family: 'Courier New', Courier, monospace;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      color: #f0f0f0;
+    }
+    #clock {
+      text-align: center;
+      font-size: 20px;
+      margin-bottom: 20px;
+      color: #cccccc;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 18px;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+    }
+    th {
+      background-color: #003366;
+      border-bottom: 2px solid #ffffff;
+    }
+    tr:nth-child(even) {
+      background-color: #003366;
+    }
+    tr:nth-child(odd) {
+      background-color: #004080;
+    }
+    .status {
+      font-weight: bold;
+    }
+    .on-time {
+      color: #00cc66;
+    }
+    .delayed {
+      color: #ffcc00;
+    }
+    .cancelled {
+      color: #ff4444;
+    }
+  </style>
+</head>
+<body>
+
+  <h1 id="title">Départs – Aéroport de Paris-Charles de Gaulle (CDG)</h1>
+  <div id="clock">Chargement de l'heure...</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th id="th-logo"></th>
+        <th id="th-time"></th>
+        <th id="th-destination">Destination</th>
+        <th id="th-flightpax"></th>
+        <th id="th-flightatc"></th>
+        <th id="th-gate">Porte</th>
+        <th id="th-status"></th>
+      </tr>
+    </thead>
+    <tbody id="flights"></tbody>
+  </table>
+
+  <script>
+    let currentLang = 'fr';
+    let flights = [];
+
+    const logos = {
+      AF: "./img/airfrance.png",
+      AZ: "./img/ita-airways.png",
+      LH: "./img/lufthansa.png",
+      IB: "./img/iberia.png",
+      HV: "./img/transavia.png",
+      U2: "./img/easyjet.png",
+    };
+
+    const translations = {
+      fr: {
+        title: 'Départs – Aéroport de Paris-Charles de Gaulle (CDG)',
+        logo: '',
+        time: '',
+        destination: 'Destination',
+        flightpax: 'Vol',
+        flightatc: '',
+        gate: 'Porte',
+        status: '',
+        statuses: {
+          'On Time': 'À l\'heure',
+          'Delayed': 'Retardé',
+          'Cancelled': 'Annulé'
+        }
+      },
+      en: {
+        title: 'Departures – Paris-Charles de Gaulle Airport (CDG)',
+        logo: '',
+        time: '',
+        destination: 'Destination',
+        flightpax: 'Flight',
+        flightatc: '',
+        gate: 'Gate',
+        status: '',
+        statuses: {
+          'À l\'heure': 'On Time',
+          'Retardé': 'Delayed',
+          'Annulé': 'Cancelled'
+        }
+      }
+    };
+
+    function normalizeStatus(status) {
+      return status.trim().replace(/l heure/g, "l'heure");
+    }
+
+    function getStatusClass(status) {
+      const s = normalizeStatus(status);
+      if (s === 'À l\'heure' || s === 'On Time') return 'on-time';
+      if (s === 'Retardé' || s === 'Delayed') return 'delayed';
+      if (s === 'Annulé' || s === 'Cancelled') return 'cancelled';
+      return '';
+    }
+
+    function loadCSV() {
+      fetch('Classeur2.csv')
+        .then(response => response.text())
+        .then(text => {
+          const lines = text.trim().split('\n');
+          flights = [];
+
+          lines.slice(1).forEach(line => {
+            const [logo, time, destination_fr, destination_en, flightpax, flightatc, gate, status] = line.split(';');
+            flights.push({ logo, time, destination_fr, destination_en, flightpax, flightatc, gate, status });
+          });
+
+          renderTable();
+        })
+        .catch(err => {
+          console.error('Erreur de chargement du fichier CSV :', err);
+        });
+    }
+
+    function renderTable() {
+      const lang = translations[currentLang];
+      document.getElementById('title').textContent = lang.title;
+      document.getElementById('th-logo').textContent = lang.logo;
+      document.getElementById('th-time').textContent = lang.time;
+      document.getElementById('th-destination').textContent = lang.destination;
+      document.getElementById('th-flightpax').textContent = lang.flightpax;
+      document.getElementById('th-flightatc').textContent = lang.flightatc;
+      document.getElementById('th-gate').textContent = lang.gate;
+      document.getElementById('th-status').textContent = lang.status;
+
+      const tbody = document.getElementById('flights');
+      tbody.innerHTML = '';
+
+      flights.forEach(f => {
+        const rawStatus = normalizeStatus(f.status);
+        const translatedStatus = lang.statuses[rawStatus] || rawStatus;
+        const destination = currentLang === 'fr' ? f.destination_fr : f.destination_en;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><img src="${logos[f.logo] || f.logo}" alt="${f.logo}" style="height:20px;"></td>
+          <td>${f.time}</td>
+          <td>${destination}</td>
+          <td>${f.flightpax}</td>
+          <td>${f.flightatc}</td>
+          <td>${f.gate}</td>
+          <td class="status ${getStatusClass(translatedStatus)}">${translatedStatus}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString(currentLang === 'fr' ? 'fr-FR' : 'en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      document.getElementById('clock').textContent = timeString;
+    }
+
+    function autoSwitchLanguage() {
+      currentLang = currentLang === 'fr' ? 'en' : 'fr';
+      renderTable();
+    }
+
+    loadCSV();
+    setInterval(autoSwitchLanguage, 5000);
+    setInterval(loadCSV, 10000);
+    setInterval(updateClock, 1000);
+  </script>
+
+  <br>Développé par © Le Volet Aérien
+</body>
+</html>
